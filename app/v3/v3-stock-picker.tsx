@@ -852,7 +852,7 @@ function PlaybackChart({
     ...benchmarkValues.filter((value): value is number => value !== null),
     1
   );
-  const chartMax = Math.ceil(maxValue / 2000) * 2000;
+  const chartMax = Math.max(12_000, Math.ceil(maxValue / 2000) * 2000);
   const yTicks = Array.from({ length: Math.floor(chartMax / 2000) + 1 }, (_, index) => chartMax - index * 2000);
   const chartWidth = 860;
   const chartHeight = 320;
@@ -1769,6 +1769,10 @@ export function V3StockPicker({ initialData, loadError }: V3StockPickerProps) {
 
   function forceQuitRun() {
     setActiveRun(null);
+    setPlayerProfile(null);
+    setProfileForm({ email: "", walletAddress: "" });
+    setPortfolio([]);
+    setSearchQuery("");
     setShowProfileGate(false);
     setShowEndChallengeConfirm(false);
     setProfileError(null);
