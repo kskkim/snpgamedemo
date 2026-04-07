@@ -271,6 +271,81 @@ function EmptyPortfolioSlot() {
   );
 }
 
+function PortfolioSlotPicker({
+  assets,
+  addedSymbols,
+  onSelect,
+  onClose,
+}: {
+  assets: V3Asset[];
+  addedSymbols: Set<string>;
+  onSelect: (symbol: string) => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="absolute inset-0 z-30 flex items-center justify-center rounded-[1.45rem] bg-[rgba(6,12,18,0.42)] px-4 py-4 backdrop-blur-sm">
+      <button
+        type="button"
+        aria-label="Close slot picker"
+        onClick={onClose}
+        className="absolute inset-0 rounded-[1.45rem]"
+      />
+      <div className="relative z-10 flex w-full max-w-[420px] flex-col overflow-hidden rounded-[1.4rem] border border-white/14 bg-[rgba(12,29,39,0.98)] shadow-[0_24px_60px_rgba(0,0,0,0.34)]">
+        <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+          <div>
+            <p className="text-xs font-semibold tracking-[0.16em] text-white/56 uppercase">
+              Add Stock
+            </p>
+            <p className="mt-1 text-lg font-semibold text-white">Choose from the universe</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full border border-white/14 bg-white/8 px-3 py-1.5 text-xs font-semibold text-white/80 transition-colors hover:bg-white/14"
+          >
+            Close
+          </button>
+        </div>
+        <div className="max-h-[360px] overflow-y-auto px-3 py-3">
+          <div className="space-y-2">
+            {assets.map((asset) => {
+              const isAdded = addedSymbols.has(asset.symbol);
+
+              return (
+                <button
+                  key={asset.id}
+                  type="button"
+                  onClick={() => onSelect(asset.symbol)}
+                  disabled={isAdded}
+                  className="grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-[1rem] border border-white/8 bg-white/[0.06] px-3 py-3 text-left text-white transition-colors hover:bg-white/[0.1] disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  <div className="flex min-w-0 items-center gap-3">
+                    <AssetAvatar asset={asset} size="sm" />
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold">
+                        {formatStockSymbol(asset.symbol)}
+                      </p>
+                      <p className="truncate text-xs text-white/58">{asset.name}</p>
+                    </div>
+                  </div>
+                  <span className="text-xs font-semibold text-white/72">
+                    {isAdded ? "Added" : "Select"}
+                  </span>
+                </button>
+              );
+            })}
+            {assets.length === 0 ? (
+              <div className="rounded-[1rem] border border-white/8 bg-white/[0.05] px-4 py-10 text-center text-sm text-white/62">
+                No matching stocks found.
+              </div>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function formatCompactNumber(value: number): string {
   return value >= 100 ? value.toFixed(0) : value.toFixed(2).replace(/\.00$/, "");
 }
@@ -1040,6 +1115,7 @@ export function V3StockPicker({ initialData, loadError }: V3StockPickerProps) {
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [showProfileGate, setShowProfileGate] = useState(false);
   const [showEndChallengeConfirm, setShowEndChallengeConfirm] = useState(false);
+  const [selectedPortfolioSlot, setSelectedPortfolioSlot] = useState<number | null>(null);
 
   const assetMap = useMemo(
     () => Object.fromEntries(currentData.assets.map((asset) => [asset.symbol, asset])),
@@ -1538,6 +1614,36 @@ export function V3StockPicker({ initialData, loadError }: V3StockPickerProps) {
     }
 
     setPortfolio((current) => [...current, { symbol, allocation }]);
+  }
+
+  function setPortfolioSlot(symbol: string, index: number) {
+    if (portfolioMap[symbol]) {
+      setSelectedPortfolioSlot(null);
+      return;
+    }
+
+    setPortfolio((current) => {
+      if (index < 0 || index >= MAX_PORTFOLIO_SIZE) {
+        return current;
+      }
+
+      const next = [...current];
+      const allocation = Math.min(1000, STARTING_BUDGET - next.reduce((sum, entry) => sum + entry.allocation, 0));
+
+      if (allocation <= 0) {
+        return current;
+      }
+
+      if (index < next.length) {
+        next.splice(index, 0, { symbol, allocation });
+      } else {
+        next.push({ symbol, allocation });
+      }
+
+      return next.slice(0, MAX_PORTFOLIO_SIZE);
+    });
+
+    setSelectedPortfolioSlot(null);
   }
 
   function updatePortfolioAllocation(symbol: string, nextRawValue: number) {
@@ -2190,18 +2296,36 @@ export function V3StockPicker({ initialData, loadError }: V3StockPickerProps) {
                 <p className="mt-1.5 text-center text-xs font-medium text-white/70">
                   Choose up to 8 stocks
                 </p>
-                <div className="mt-3 grid grid-cols-2 gap-2">
+                <div className="relative mt-3 grid grid-cols-2 gap-2">
                   {Array.from({ length: MAX_PORTFOLIO_SIZE }, (_, index) => {
                     const entry = portfolio[index];
 
                     if (!entry) {
-                      return <EmptyPortfolioSlot key={`empty-slot-${index}`} />;
+                      return (
+                        <button
+                          key={`empty-slot-${index}`}
+                          type="button"
+                          onClick={() => setSelectedPortfolioSlot(index)}
+                          className="text-left transition-transform hover:-translate-y-0.5"
+                        >
+                          <EmptyPortfolioSlot />
+                        </button>
+                      );
                     }
 
                     const asset = assetMap[entry.symbol];
 
                     if (!asset) {
-                      return <EmptyPortfolioSlot key={`missing-slot-${entry.symbol}`} />;
+                      return (
+                        <button
+                          key={`missing-slot-${entry.symbol}`}
+                          type="button"
+                          onClick={() => setSelectedPortfolioSlot(index)}
+                          className="text-left transition-transform hover:-translate-y-0.5"
+                        >
+                          <EmptyPortfolioSlot />
+                        </button>
+                      );
                     }
 
                     return (
@@ -2242,6 +2366,15 @@ export function V3StockPicker({ initialData, loadError }: V3StockPickerProps) {
                       </div>
                     );
                   })}
+
+                  {selectedPortfolioSlot !== null ? (
+                    <PortfolioSlotPicker
+                      assets={filteredStocks}
+                      addedSymbols={addedSymbols}
+                      onSelect={(symbol) => setPortfolioSlot(symbol, selectedPortfolioSlot)}
+                      onClose={() => setSelectedPortfolioSlot(null)}
+                    />
+                  ) : null}
                 </div>
 
                 <div className="mt-3 rounded-xl border border-[#123343]/30 bg-[#f3dcc8] px-3 py-2.5 text-center text-[#191716] shadow-[inset_0_1px_0_rgba(255,255,255,0.35)]">
