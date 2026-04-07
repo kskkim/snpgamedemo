@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Beat the S&P 500 in 10 Trades",
+  title: "Benchmark Battle",
   description:
-    "A simple stock-picking challenge landing page built for Milestone 1.",
+    "A five-minute benchmark battle where players build a portfolio and try to beat the S&P 500.",
 };
 
 export default function RootLayout({

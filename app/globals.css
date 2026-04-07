@@ -46,3 +46,41 @@ a {
 ::selection {
   background: rgba(15, 118, 110, 0.18);
 }
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.rules-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(70, 84, 96, 0.38) transparent;
+}
+
+.rules-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+
+.rules-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.rules-scroll::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(70, 84, 96, 0.34);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.rules-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(86, 101, 114, 0.44);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}

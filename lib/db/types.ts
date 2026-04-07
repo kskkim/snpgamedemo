@@ -6,261 +6,175 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[];
 
-export type ChallengeStatus = "active" | "completed";
-export type TradeSide = "buy" | "sell";
-
 export interface Database {
   public: {
     Tables: {
-      challenges: {
+      v3_players: {
         Row: {
           id: string;
-          user_id: string | null;
-          starting_cash: number;
-          cash: number;
-          trade_count: number;
-          max_trades: number;
+          auth_user_id: string | null;
+          email: string;
+          username: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          auth_user_id?: string | null;
+          email: string;
+          username: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          auth_user_id?: string | null;
+          email?: string;
+          username?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      v3_runs: {
+        Row: {
+          id: string;
+          player_id: string;
+          player_email: string;
+          player_username: string;
+          selected_symbols: string[];
+          allocations: Json;
+          starting_budget: number;
+          duration_seconds: number;
           benchmark_symbol: string;
-          benchmark_start_price: number;
-          benchmark_end_price: number | null;
-          status: ChallengeStatus;
+          benchmark_start_price: number | null;
+          portfolio_value: number | null;
+          user_return_pct: number | null;
+          benchmark_return_pct: number | null;
+          alpha_pct: number | null;
+          status: string;
           started_at: string;
+          ends_at: string;
+          last_synced_at: string | null;
           completed_at: string | null;
           created_at: string;
+          updated_at: string;
         };
         Insert: {
           id?: string;
-          user_id?: string | null;
-          starting_cash: number;
-          cash: number;
-          trade_count?: number;
-          max_trades?: number;
-          benchmark_symbol: string;
-          benchmark_start_price: number;
-          benchmark_end_price?: number | null;
-          status?: ChallengeStatus;
-          started_at?: string;
-          completed_at?: string | null;
-          created_at?: string;
-        };
-        Update: {
-          id?: string;
-          user_id?: string | null;
-          starting_cash?: number;
-          cash?: number;
-          trade_count?: number;
-          max_trades?: number;
+          player_id: string;
+          player_email: string;
+          player_username: string;
+          selected_symbols?: string[];
+          allocations?: Json;
+          starting_budget: number;
+          duration_seconds?: number;
           benchmark_symbol?: string;
-          benchmark_start_price?: number;
-          benchmark_end_price?: number | null;
-          status?: ChallengeStatus;
+          benchmark_start_price?: number | null;
+          portfolio_value?: number | null;
+          user_return_pct?: number | null;
+          benchmark_return_pct?: number | null;
+          alpha_pct?: number | null;
+          status?: string;
           started_at?: string;
+          ends_at?: string;
+          last_synced_at?: string | null;
           completed_at?: string | null;
           created_at?: string;
-        };
-        Relationships: [];
-      };
-      positions: {
-        Row: {
-          id: string;
-          challenge_id: string;
-          ticker: string;
-          qty: number;
-          avg_cost: number;
-          created_at: string;
-          updated_at: string;
-        };
-        Insert: {
-          id?: string;
-          challenge_id: string;
-          ticker: string;
-          qty: number;
-          avg_cost: number;
-          created_at?: string;
           updated_at?: string;
         };
         Update: {
           id?: string;
-          challenge_id?: string;
-          ticker?: string;
-          qty?: number;
-          avg_cost?: number;
+          player_id?: string;
+          player_email?: string;
+          player_username?: string;
+          selected_symbols?: string[];
+          allocations?: Json;
+          starting_budget?: number;
+          duration_seconds?: number;
+          benchmark_symbol?: string;
+          benchmark_start_price?: number | null;
+          portfolio_value?: number | null;
+          user_return_pct?: number | null;
+          benchmark_return_pct?: number | null;
+          alpha_pct?: number | null;
+          status?: string;
+          started_at?: string;
+          ends_at?: string;
+          last_synced_at?: string | null;
+          completed_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
         Relationships: [
           {
-            foreignKeyName: "positions_challenge_id_fkey";
-            columns: ["challenge_id"];
+            foreignKeyName: "v3_runs_player_id_fkey";
+            columns: ["player_id"];
             isOneToOne: false;
-            referencedRelation: "challenges";
+            referencedRelation: "v3_players";
             referencedColumns: ["id"];
           },
         ];
       };
-      trades: {
+      v3_run_snapshots: {
         Row: {
           id: string;
-          challenge_id: string;
-          ticker: string;
-          side: TradeSide;
-          qty: number;
-          executed_price: number;
-          trade_number: number;
-          executed_at: string;
-        };
-        Insert: {
-          id?: string;
-          challenge_id: string;
-          ticker: string;
-          side: TradeSide;
-          qty: number;
-          executed_price: number;
-          trade_number: number;
-          executed_at?: string;
-        };
-        Update: {
-          id?: string;
-          challenge_id?: string;
-          ticker?: string;
-          side?: TradeSide;
-          qty?: number;
-          executed_price?: number;
-          trade_number?: number;
-          executed_at?: string;
-        };
-        Relationships: [
-          {
-            foreignKeyName: "trades_challenge_id_fkey";
-            columns: ["challenge_id"];
-            isOneToOne: false;
-            referencedRelation: "challenges";
-            referencedColumns: ["id"];
-          },
-        ];
-      };
-      latest_prices: {
-        Row: {
-          ticker: string;
-          price: number;
-          source: string;
-          updated_at: string;
-        };
-        Insert: {
-          ticker: string;
-          price: number;
-          source: string;
-          updated_at?: string;
-        };
-        Update: {
-          ticker?: string;
-          price?: number;
-          source?: string;
-          updated_at?: string;
-        };
-        Relationships: [];
-      };
-      game_symbols: {
-        Row: {
-          symbol: string;
-          company_name: string;
-          is_featured: boolean;
-        };
-        Insert: {
-          symbol: string;
-          company_name: string;
-          is_featured?: boolean;
-        };
-        Update: {
-          symbol?: string;
-          company_name?: string;
-          is_featured?: boolean;
-        };
-        Relationships: [];
-      };
-      fixed_historical_snapshots: {
-        Row: {
-          symbol: string;
-          start_date: string;
-          end_date: string;
-          start_close: number;
-          end_close: number;
-          reference_open: number;
-          buy_open: number;
-          result_close: number;
-          pre_buy_return_pct: number;
-          return_pct: number;
+          run_id: string;
+          captured_at: string;
+          portfolio_value: number;
+          benchmark_value: number;
+          holdings_value: Json;
           created_at: string;
         };
         Insert: {
-          symbol: string;
-          start_date: string;
-          end_date: string;
-          start_close: number;
-          end_close: number;
-          reference_open: number;
-          buy_open: number;
-          result_close: number;
-          pre_buy_return_pct: number;
-          return_pct: number;
+          id?: string;
+          run_id: string;
+          captured_at?: string;
+          portfolio_value: number;
+          benchmark_value: number;
+          holdings_value?: Json;
           created_at?: string;
         };
         Update: {
-          symbol?: string;
-          start_date?: string;
-          end_date?: string;
-          start_close?: number;
-          end_close?: number;
-          reference_open?: number;
-          buy_open?: number;
-          result_close?: number;
-          pre_buy_return_pct?: number;
-          return_pct?: number;
+          id?: string;
+          run_id?: string;
+          captured_at?: string;
+          portfolio_value?: number;
+          benchmark_value?: number;
+          holdings_value?: Json;
           created_at?: string;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "v3_run_snapshots_run_id_fkey";
+            columns: ["run_id"];
+            isOneToOne: false;
+            referencedRelation: "v3_runs";
+            referencedColumns: ["id"];
+          },
+        ];
       };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
-    Enums: {
-      challenge_status: ChallengeStatus;
-      trade_side: TradeSide;
-    };
+    Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
   };
 }
 
 type PublicTables = Database["public"]["Tables"];
-
 export type TableName = keyof PublicTables;
-
 export type TableRow<T extends TableName> = PublicTables[T]["Row"];
 export type TableInsert<T extends TableName> = PublicTables[T]["Insert"];
 export type TableUpdate<T extends TableName> = PublicTables[T]["Update"];
 
-export type Challenge = TableRow<"challenges">;
-export type ChallengeInsert = TableInsert<"challenges">;
-export type ChallengeUpdate = TableUpdate<"challenges">;
+export type V3Player = TableRow<"v3_players">;
+export type V3PlayerInsert = TableInsert<"v3_players">;
+export type V3PlayerUpdate = TableUpdate<"v3_players">;
 
-export type Position = TableRow<"positions">;
-export type PositionInsert = TableInsert<"positions">;
-export type PositionUpdate = TableUpdate<"positions">;
-
-export type Trade = TableRow<"trades">;
-export type TradeInsert = TableInsert<"trades">;
-export type TradeUpdate = TableUpdate<"trades">;
-
-export type LatestPrice = TableRow<"latest_prices">;
-export type LatestPriceInsert = TableInsert<"latest_prices">;
-export type LatestPriceUpdate = TableUpdate<"latest_prices">;
-
-export type GameSymbol = TableRow<"game_symbols">;
-export type GameSymbolInsert = TableInsert<"game_symbols">;
-export type GameSymbolUpdate = TableUpdate<"game_symbols">;
-
-export type FixedHistoricalSnapshot = TableRow<"fixed_historical_snapshots">;
-export type FixedHistoricalSnapshotInsert =
-  TableInsert<"fixed_historical_snapshots">;
-export type FixedHistoricalSnapshotUpdate =
-  TableUpdate<"fixed_historical_snapshots">;
+export type V3Run = TableRow<"v3_runs">;
+export type V3RunInsert = TableInsert<"v3_runs">;
+export type V3RunUpdate = TableUpdate<"v3_runs">;
+export type V3RunSnapshot = TableRow<"v3_run_snapshots">;
+export type V3RunSnapshotInsert = TableInsert<"v3_run_snapshots">;
+export type V3RunSnapshotUpdate = TableUpdate<"v3_run_snapshots">;

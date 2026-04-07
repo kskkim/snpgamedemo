@@ -1,61 +1,47 @@
 import Link from "next/link";
 
-const rules = [
-  "Make up to 10 trades during the challenge.",
-  "Track your performance against the S&P 500.",
-  "Win by finishing ahead of the index after your final trade.",
-];
-
 export default function Home() {
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-6xl flex-col justify-center px-6 py-16 sm:px-10 lg:px-12">
-      <section className="grid items-center gap-10 lg:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
-        <div className="max-w-3xl">
-          <p className="inline-flex rounded-full border border-panel-border bg-white/70 px-4 py-2 text-sm font-medium tracking-[0.2em] text-muted uppercase shadow-sm backdrop-blur-sm">
-            Milestone 1
-          </p>
-          <h1 className="mt-6 text-5xl font-semibold tracking-tight text-foreground sm:text-6xl lg:text-7xl">
-            Beat the S&amp;P 500 in 10 Trades
-          </h1>
-          <p className="mt-6 max-w-2xl text-lg leading-8 text-muted sm:text-xl">
-            A focused stock-picking challenge with one simple goal: make up to
-            10 decisions, measure every move, and find out whether you can beat
-            the market benchmark.
-          </p>
-          <div className="mt-10 flex flex-col gap-4 sm:flex-row sm:items-center">
-            <Link
-              href="/challenge"
-              className="inline-flex items-center justify-center rounded-full bg-foreground px-7 py-4 text-base font-semibold text-background transition-transform duration-150 hover:-translate-y-0.5 hover:bg-[#20302b]"
-            >
-              Start Challenge
-            </Link>
-            <p className="text-sm text-muted">
-              Clean setup, short rules, and a placeholder challenge flow for
-              the next milestone.
-            </p>
-          </div>
-        </div>
+    <main
+      className="relative flex min-h-screen items-center justify-center overflow-hidden px-6 py-10 text-white"
+      style={{
+        backgroundImage:
+          "linear-gradient(rgba(18, 34, 40, 0.36), rgba(18, 34, 40, 0.36)), url('/treasures-home-bg.png')",
+        backgroundPosition: "center",
+        backgroundSize: "cover",
+      }}
+    >
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.08),transparent_45%),linear-gradient(to_top,rgba(224,148,71,0.24),transparent_28%)]" />
 
-        <div className="rounded-[2rem] border border-panel-border bg-panel p-8 shadow-[0_20px_70px_rgba(22,33,29,0.08)] backdrop-blur-sm">
-          <p className="text-sm font-semibold tracking-[0.18em] text-muted uppercase">
-            Rules Summary
-          </p>
-          <ul className="mt-6 space-y-4">
-            {rules.map((rule, index) => (
-              <li
-                key={rule}
-                className="flex gap-4 rounded-2xl border border-panel-border bg-white/80 p-4"
-              >
-                <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-accent/10 text-sm font-semibold text-accent">
-                  {index + 1}
-                </span>
-                <p className="text-base leading-7 text-foreground">{rule}</p>
-              </li>
-            ))}
-          </ul>
-          <div className="mt-8 rounded-2xl bg-[#16211d] px-5 py-4 text-sm leading-6 text-[#dce8e3]">
-            Keep it simple: fewer trades, clearer decisions, direct comparison
-            against the index.
+      <section className="relative z-10 mx-auto flex w-full max-w-6xl flex-col items-center text-center">
+        <h1 className="max-w-5xl text-5xl font-semibold tracking-tight drop-shadow-[0_8px_24px_rgba(0,0,0,0.3)] sm:text-6xl lg:text-8xl">
+          The Treasures Challenge
+        </h1>
+        <p className="mt-6 max-w-5xl text-2xl font-semibold leading-tight drop-shadow-[0_6px_18px_rgba(0,0,0,0.28)] sm:text-3xl lg:text-4xl">
+          Beat the S&amp;P 500 over 24 hours to win a Pokemon Slab &amp; Treasures Points
+        </p>
+
+        <div className="mt-14 flex w-full max-w-[860px] flex-col items-center gap-7">
+          <Link
+            href="/v3"
+            className="flex min-h-[132px] w-full items-center justify-center border-[3px] border-[#0d3550] bg-[#1f678d]/95 px-8 text-2xl font-medium text-white shadow-[0_14px_40px_rgba(0,0,0,0.28)] transition-transform hover:scale-[1.01]"
+          >
+            Start Challenge
+          </Link>
+
+          <div className="flex w-full max-w-[560px] flex-col gap-7 sm:flex-row sm:justify-center">
+            <Link
+              href="/v3"
+              className="flex min-h-[158px] flex-1 items-center justify-center border-[3px] border-[#0d3550] bg-[#1f678d]/95 px-8 text-2xl font-medium text-white shadow-[0_14px_40px_rgba(0,0,0,0.28)] transition-transform hover:scale-[1.01]"
+            >
+              Rules
+            </Link>
+            <Link
+              href="/v3/leaderboard"
+              className="flex min-h-[158px] flex-1 items-center justify-center border-[3px] border-[#0d3550] bg-[#1f678d]/95 px-8 text-2xl font-medium text-white shadow-[0_14px_40px_rgba(0,0,0,0.28)] transition-transform hover:scale-[1.01]"
+            >
+              Leaderboard
+            </Link>
           </div>
         </div>
       </section>
