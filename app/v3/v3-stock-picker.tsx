@@ -1157,6 +1157,7 @@ export function V3StockPicker({ initialData, loadError }: V3StockPickerProps) {
   const [showProfileGate, setShowProfileGate] = useState(false);
   const [showEndChallengeConfirm, setShowEndChallengeConfirm] = useState(false);
   const [selectedPortfolioSlot, setSelectedPortfolioSlot] = useState<number | null>(null);
+  const [consecutiveWins, setConsecutiveWins] = useState<number | null>(null);
 
   const assetMap = useMemo(
     () => Object.fromEntries(currentData.assets.map((asset) => [asset.symbol, asset])),
@@ -1255,13 +1256,13 @@ export function V3StockPicker({ initialData, loadError }: V3StockPickerProps) {
   }, [hasRestoredState, playerProfile]);
 
   useEffect(() => {
-    if (!hasRestoredState || !playerProfile || activeRun || step === "play") {
+    if (!hasRestoredState || !playerProfile) {
       return;
     }
 
     let cancelled = false;
 
-    const restoreActiveRun = async () => {
+    const refreshRunFromServer = async () => {
       try {
         const response = await fetch(
           `/api/v3/runs/active?playerId=${encodeURIComponent(playerProfile.id)}`,
@@ -1270,6 +1271,14 @@ export function V3StockPicker({ initialData, loadError }: V3StockPickerProps) {
         const payload = (await response.json().catch(() => null)) as ActiveRunResponse | null;
 
         if (!response.ok || cancelled || !payload?.run) {
+          return;
+        }
+
+        if (
+          activeRun?.runId &&
+          payload.run.id !== activeRun.runId &&
+          payload.run.status !== "active"
+        ) {
           return;
         }
 
@@ -1293,12 +1302,12 @@ export function V3StockPicker({ initialData, loadError }: V3StockPickerProps) {
       }
     };
 
-    void restoreActiveRun();
+    void refreshRunFromServer();
 
     return () => {
       cancelled = true;
     };
-  }, [activeRun, assetMap, currentData.benchmark, hasRestoredState, playerProfile, step]);
+  }, [activeRun?.runId, assetMap, currentData.benchmark, hasRestoredState, playerProfile, step]);
 
   async function restoreActiveRunForPlayer(playerId: string): Promise<boolean> {
     try {
@@ -1495,6 +1504,42 @@ export function V3StockPicker({ initialData, loadError }: V3StockPickerProps) {
   }, [activeRun, now]);
 
   const isFinished = step === "play" && Boolean(activeRun) && progress >= 1;
+
+  useEffect(() => {
+    if (!isFinished || !playerProfile?.id) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadStreak = async () => {
+      try {
+        const response = await fetch(
+          `/api/v3/player/${encodeURIComponent(playerProfile.id)}/streak`,
+          { cache: "no-store" }
+        );
+        const payload = (await response.json().catch(() => null)) as
+          | { consecutiveWins?: number }
+          | null;
+
+        if (!response.ok || cancelled) {
+          return;
+        }
+
+        setConsecutiveWins(payload?.consecutiveWins ?? 0);
+      } catch {
+        if (!cancelled) {
+          setConsecutiveWins(null);
+        }
+      }
+    };
+
+    void loadStreak();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isFinished, playerProfile?.id]);
 
   const playMetrics = useMemo(() => {
     if (!activeRun) {
@@ -1911,6 +1956,7 @@ export function V3StockPicker({ initialData, loadError }: V3StockPickerProps) {
     setNow(Date.now());
     setRemainingMs(GAME_DURATION_MS);
     setLastSnapshotAt(null);
+    setConsecutiveWins(null);
     setStep("start");
   }
 
@@ -1926,6 +1972,7 @@ export function V3StockPicker({ initialData, loadError }: V3StockPickerProps) {
     setNow(Date.now());
     setRemainingMs(GAME_DURATION_MS);
     setLastSnapshotAt(null);
+    setConsecutiveWins(null);
     setStep("start");
   }
 
@@ -1942,6 +1989,7 @@ export function V3StockPicker({ initialData, loadError }: V3StockPickerProps) {
     setNow(Date.now());
     setRemainingMs(GAME_DURATION_MS);
     setLastSnapshotAt(null);
+    setConsecutiveWins(null);
     setStep("start");
   }
 
@@ -2160,6 +2208,12 @@ export function V3StockPicker({ initialData, loadError }: V3StockPickerProps) {
                     {formatPercent(playMetrics.benchmarkReturn)}
                   </p>
                 </div>
+              </div>
+              <div className="mt-4 rounded-2xl bg-[#f6f7f3] px-4 py-4 text-left">
+                <p className="text-sm text-muted">Consecutive wins</p>
+                <p className="mt-2 text-2xl font-semibold text-foreground">
+                  {consecutiveWins ?? 0}
+                </p>
               </div>
               <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
                 <button

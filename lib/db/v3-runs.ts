@@ -293,6 +293,27 @@ export async function listV3Leaderboard(
   return (data ?? []) as V3Run[];
 }
 
+export async function listV3CompletedRunsForPlayer(
+  playerId: string,
+  limit = 50,
+  options: QueryOptions = {}
+): Promise<V3Run[]> {
+  const supabase = getClient(options.client);
+  const { data, error } = await supabase
+    .from("v3_runs")
+    .select("*")
+    .eq("player_id", playerId)
+    .eq("status", "completed")
+    .order("completed_at", { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    throw new Error("Failed to load player V3 runs: " + error.message);
+  }
+
+  return (data ?? []) as V3Run[];
+}
+
 export async function listActiveV3Runs(options: QueryOptions = {}): Promise<V3Run[]> {
   const supabase = getClient(options.client);
   const { data, error } = await supabase
