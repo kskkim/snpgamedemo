@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import type {
   V3Asset,
@@ -217,8 +217,10 @@ function formatProfileName(profile: V3PlayerProfile | null): string {
 
 function ProfileMenu({
   profile,
+  onLogout,
 }: {
   profile: V3PlayerProfile | null;
+  onLogout?: () => void;
 }) {
   if (!profile) {
     return null;
@@ -237,6 +239,15 @@ function ProfileMenu({
           {formatShortWalletAddress(profile.walletAddress)}
         </span>
       </span>
+      {onLogout ? (
+        <button
+          type="button"
+          onClick={onLogout}
+          className="rounded-full border border-white/20 bg-black/12 px-3 py-1.5 text-xs font-semibold text-white/88 transition hover:bg-black/22"
+        >
+          Log out
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -840,7 +851,10 @@ function PlaybackChart({
 }: {
   run: ActiveRun;
 }) {
-  const [selectedHourIndex, setSelectedHourIndex] = useState(0);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const viewportRef = useRef<HTMLDivElement | null>(null);
+  const previousSlotCountRef = useRef(0);
+  const [viewportWidth, setViewportWidth] = useState(0);
   const elapsedMs = Math.min(run.durationMs, Math.max(0, Date.now() - run.startedAt));
   const latestTimestamp = Math.min(run.startedAt + elapsedMs, Date.now());
   const totalHourSlots = Math.min(24, Math.max(1, Math.floor(elapsedMs / HOUR_MS) + 1));
@@ -856,17 +870,6 @@ function PlaybackChart({
     };
   });
 
-  useEffect(() => {
-    setSelectedHourIndex((current) =>
-      Math.min(current, Math.max(hourSlots.length - 1, 0))
-    );
-  }, [hourSlots.length]);
-
-  useEffect(() => {
-    setSelectedHourIndex(hourSlots.length - 1);
-  }, [hourSlots.length, latestTimestamp]);
-
-  const visibleSlots = hourSlots.slice(0, Math.max(0, selectedHourIndex + 1));
   const displaySlotCount = Math.max(6, hourSlots.length || 0);
   const displaySlots = Array.from({ length: displaySlotCount }, (_, index) => {
     const visibleSlot = hourSlots[index];
@@ -883,6 +886,32 @@ function PlaybackChart({
       empty: true,
     };
   });
+
+  useEffect(() => {
+    const updateViewportWidth = () => {
+      setViewportWidth(viewportRef.current?.clientWidth ?? 0);
+    };
+
+    updateViewportWidth();
+    window.addEventListener("resize", updateViewportWidth);
+
+    return () => window.removeEventListener("resize", updateViewportWidth);
+  }, []);
+
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+
+    if (!container) {
+      return;
+    }
+
+    if (displaySlotCount === previousSlotCountRef.current) {
+      return;
+    }
+
+    container.scrollLeft = container.scrollWidth - container.clientWidth;
+    previousSlotCountRef.current = displaySlotCount;
+  }, [displaySlotCount]);
 
   const stackedSeries = run.assets.map((entry, index) => {
     const color = LINE_COLORS[index % LINE_COLORS.length];
@@ -929,16 +958,19 @@ function PlaybackChart({
   );
   const chartMax = Math.max(12_000, Math.ceil(maxValue / 2000) * 2000);
   const yTicks = Array.from({ length: Math.floor(chartMax / 2000) + 1 }, (_, index) => chartMax - index * 2000);
-  const chartWidth = 860;
-  const chartHeight = 320;
-  const plotLeft = 78;
-  const plotRight = 76;
+  const axisWidth = 92;
+  const visibleSlotCount = 6;
+  const plotRight = 34;
+  const availablePlotWidth = Math.max(640, viewportWidth - axisWidth);
+  const slotPixelWidth = Math.max(92, Math.floor((availablePlotWidth - plotRight) / visibleSlotCount));
+  const visiblePlotWidth = visibleSlotCount * slotPixelWidth + plotRight;
+  const chartWidth = Math.max(displaySlotCount, visibleSlotCount) * slotPixelWidth + plotRight;
+  const chartHeight = 420;
   const plotTop = 20;
-  const plotBottom = 58;
-  const plotWidth = chartWidth - plotLeft - plotRight;
+  const plotBottom = 66;
   const plotHeight = chartHeight - plotTop - plotBottom;
-  const slotSpacing = plotWidth / Math.max(displaySlots.length, 1);
-  const barWidth = Math.min(40, Math.max(10, slotSpacing * 0.52));
+  const slotSpacing = slotPixelWidth;
+  const barWidth = 58;
 
   function getY(value: number): number {
     return plotTop + plotHeight - (value / chartMax) * plotHeight;
@@ -946,10 +978,10 @@ function PlaybackChart({
 
   const benchmarkPoints = benchmarkValues
     .map((value, index) => {
-      if (value === null || index > selectedHourIndex) {
+      if (value === null) {
         return null;
       }
-      const x = plotLeft + slotSpacing * index + slotSpacing / 2;
+      const x = slotSpacing * index + slotSpacing / 2;
       const y = getY(value);
       return `${x.toFixed(1)},${y.toFixed(1)}`;
     })
@@ -958,107 +990,135 @@ function PlaybackChart({
 
   return (
     <section className="rounded-[1.4rem] border border-[#4e6370]/16 bg-white px-5 py-5 shadow-[0_12px_28px_rgba(0,0,0,0.06)]">
-      <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="w-full" aria-label="Portfolio timelapse chart">
-        {yTicks.map((value) => {
-          const y = getY(value);
-          return (
-            <g key={value}>
-              <line x1={plotLeft} x2={chartWidth - plotRight} y1={y} y2={y} stroke="#d9d9d9" strokeWidth="1" />
-              <text x={plotLeft - 14} y={y + 6} textAnchor="end" fontSize="14" fill="#3a3a3a">
-                {formatChartCurrency(value)}
-              </text>
-            </g>
-          );
-        })}
-
-        {displaySlots.map((slot, slotIndex) => {
-          const xCenter = plotLeft + slotSpacing * slotIndex + slotSpacing / 2;
-          let stackedTop = plotTop + plotHeight;
-          const hasData = !("empty" in slot);
-          const portfolioTotal = hasData ? portfolioTotals[slotIndex] : null;
-
-          return (
-            <g key={slot.timestamp}>
-              {hasData && slotIndex <= selectedHourIndex
-                ? stackedSeries.map((series) => {
-                    const value = series.values[slotIndex];
-                    const barHeight = (value / chartMax) * plotHeight;
-                    stackedTop -= barHeight;
-
-                    if (value <= 0) {
-                      return null;
-                    }
-
-                    return (
-                      <rect
-                        key={`${series.label}-${slot.timestamp}`}
-                        x={xCenter - barWidth / 2}
-                        y={stackedTop}
-                        width={barWidth}
-                        height={barHeight}
-                        fill={series.color}
-                        opacity="0.9"
-                      />
-                    );
-                  })
-                : null}
-              {hasData && slotIndex <= selectedHourIndex && portfolioTotal !== null ? (
-                <text
-                  x={xCenter}
-                  y={Math.max(getY(portfolioTotal) - 22, plotTop - 2)}
-                  textAnchor="middle"
-                  fontSize="12"
-                  fontWeight="700"
-                  fill="#0f766e"
-                >
-                  {formatChartCurrency(portfolioTotal)}
+      <div ref={viewportRef} className="flex w-full overflow-hidden">
+        <svg
+          viewBox={`0 0 ${axisWidth} ${chartHeight}`}
+          className="h-auto shrink-0"
+          style={{ width: `${axisWidth}px` }}
+          aria-hidden="true"
+        >
+          {yTicks.map((value) => {
+            const y = getY(value);
+            return (
+              <g key={value}>
+                <text x={axisWidth - 10} y={y + 6} textAnchor="end" fontSize="14" fill="#3a3a3a">
+                  {formatChartCurrency(value)}
                 </text>
-              ) : null}
-              <text x={xCenter} y={chartHeight - 26} textAnchor="middle" fontSize="13" fill="#222">
-                {slot.label}
-              </text>
-            </g>
-          );
-        })}
+              </g>
+            );
+          })}
+          <line x1={axisWidth - 2} x2={axisWidth - 2} y1={plotTop} y2={plotTop + plotHeight} stroke="#3a3a3a" strokeWidth="1.5" />
+        </svg>
 
-        {benchmarkPoints ? (
-          <polyline
-            fill="none"
-            stroke="#17324f"
-            strokeWidth="4"
-            strokeLinejoin="round"
-            strokeLinecap="round"
-            points={benchmarkPoints}
-          />
-        ) : null}
-        {benchmarkValues.map((value, index) => {
-          if (value === null || index > selectedHourIndex) {
-            return null;
-          }
+        <div
+          ref={scrollContainerRef}
+          className="overflow-x-auto overflow-y-hidden"
+          style={{ width: `${visiblePlotWidth}px` }}
+        >
+          <svg
+            viewBox={`0 0 ${chartWidth} ${chartHeight}`}
+            className="h-auto max-w-none"
+            style={{ width: `${chartWidth}px` }}
+            aria-label="Portfolio timelapse chart"
+          >
+            {yTicks.map((value) => {
+              const y = getY(value);
+              return (
+                <g key={value}>
+                  <line x1={0} x2={chartWidth - plotRight} y1={y} y2={y} stroke="#d9d9d9" strokeWidth="1" />
+                </g>
+              );
+            })}
 
-          const x = plotLeft + slotSpacing * index + slotSpacing / 2;
-          const y = getY(value);
+            {displaySlots.map((slot, slotIndex) => {
+              const xCenter = slotSpacing * slotIndex + slotSpacing / 2;
+              let stackedTop = plotTop + plotHeight;
+              const hasData = !("empty" in slot);
+              const portfolioTotal = hasData ? portfolioTotals[slotIndex] : null;
 
-          return (
-            <g key={`benchmark-${hourSlots[index]?.timestamp ?? index}`}>
-              <circle cx={x} cy={y} r="3.5" fill="#17324f" />
-              <text
-                x={x + 8}
-                y={Math.max(y - 6, plotTop + 10)}
-                fontSize="12"
-                fontWeight="600"
-                fill="#17324f"
-              >
-                {formatChartCurrency(value)}
-              </text>
-            </g>
-          );
-        })}
+              return (
+                <g key={slot.timestamp}>
+                  {hasData
+                    ? stackedSeries.map((series) => {
+                        const value = series.values[slotIndex];
+                        const barHeight = (value / chartMax) * plotHeight;
+                        stackedTop -= barHeight;
 
-        <line x1={plotLeft} x2={plotLeft} y1={plotTop} y2={plotTop + plotHeight} stroke="#3a3a3a" strokeWidth="1.5" />
-        <line x1={chartWidth - plotRight} x2={chartWidth - plotRight} y1={plotTop} y2={plotTop + plotHeight} stroke="#3a3a3a" strokeWidth="1.5" />
-        <line x1={plotLeft} x2={chartWidth - plotRight} y1={plotTop + plotHeight} y2={plotTop + plotHeight} stroke="#3a3a3a" strokeWidth="1.5" />
-      </svg>
+                        if (value <= 0) {
+                          return null;
+                        }
+
+                        return (
+                          <rect
+                            key={`${series.label}-${slot.timestamp}`}
+                            x={xCenter - barWidth / 2}
+                            y={stackedTop}
+                            width={barWidth}
+                            height={barHeight}
+                            fill={series.color}
+                            opacity="0.9"
+                          />
+                        );
+                      })
+                    : null}
+                  {hasData && portfolioTotal !== null ? (
+                    <text
+                      x={xCenter}
+                      y={Math.max(getY(portfolioTotal) - 22, plotTop - 2)}
+                      textAnchor="middle"
+                      fontSize="12"
+                      fontWeight="700"
+                      fill="#0f766e"
+                    >
+                      {formatChartCurrency(portfolioTotal)}
+                    </text>
+                  ) : null}
+                  <text x={xCenter} y={chartHeight - 26} textAnchor="middle" fontSize="13" fill="#222">
+                    {slot.label}
+                  </text>
+                </g>
+              );
+            })}
+
+            {benchmarkPoints ? (
+              <polyline
+                fill="none"
+                stroke="#17324f"
+                strokeWidth="4"
+                strokeLinejoin="round"
+                strokeLinecap="round"
+                points={benchmarkPoints}
+              />
+            ) : null}
+            {benchmarkValues.map((value, index) => {
+              if (value === null) {
+                return null;
+              }
+
+              const x = slotSpacing * index + slotSpacing / 2;
+              const y = getY(value);
+
+              return (
+                <g key={`benchmark-${hourSlots[index]?.timestamp ?? index}`}>
+                  <circle cx={x} cy={y} r="3.5" fill="#17324f" />
+                  <text
+                    x={x + 8}
+                    y={Math.max(y - 6, plotTop + 10)}
+                    fontSize="12"
+                    fontWeight="600"
+                    fill="#17324f"
+                  >
+                    {index === 0 ? "" : formatChartCurrency(value)}
+                  </text>
+                </g>
+              );
+            })}
+
+            <line x1={chartWidth - plotRight} x2={chartWidth - plotRight} y1={plotTop} y2={plotTop + plotHeight} stroke="#3a3a3a" strokeWidth="1.5" />
+            <line x1={0} x2={chartWidth - plotRight} y1={plotTop + plotHeight} y2={plotTop + plotHeight} stroke="#3a3a3a" strokeWidth="1.5" />
+          </svg>
+        </div>
+      </div>
 
       <div className="mt-2 flex flex-wrap items-center justify-center gap-x-6 gap-y-3 text-sm font-medium text-[#222]">
         <span className="flex items-center gap-2">
@@ -1072,25 +1132,6 @@ function PlaybackChart({
           </span>
         ))}
       </div>
-
-      {hourSlots.length > 6 ? (
-        <div className="mt-5 px-2">
-          <div className="flex items-center justify-between text-xs font-semibold tracking-[0.12em] text-[#5a6670] uppercase">
-            <span>Hour 1</span>
-            <span>Latest Hour</span>
-          </div>
-          <input
-            type="range"
-            min="0"
-            max={Math.max(hourSlots.length - 1, 0)}
-            step="1"
-            value={selectedHourIndex}
-            onChange={(event) => setSelectedHourIndex(Number(event.target.value))}
-            className="mt-2 h-2 w-full cursor-pointer appearance-none rounded-full bg-[#d9e1e7] accent-[#1b6890]"
-            aria-label="Timelapse hour slider"
-          />
-        </div>
-      ) : null}
     </section>
   );
 }
@@ -1888,6 +1929,22 @@ export function V3StockPicker({ initialData, loadError }: V3StockPickerProps) {
     setStep("start");
   }
 
+  function logOutPlayer() {
+    setActiveRun(null);
+    setPlayerProfile(null);
+    setProfileForm({ email: "", walletAddress: "" });
+    setPortfolio([]);
+    setSearchQuery("");
+    setShowProfileGate(false);
+    setShowEndChallengeConfirm(false);
+    setSelectedPortfolioSlot(null);
+    setProfileError(null);
+    setNow(Date.now());
+    setRemainingMs(GAME_DURATION_MS);
+    setLastSnapshotAt(null);
+    setStep("start");
+  }
+
   if (!hasRestoredState) {
     return (
       <main className="mx-auto min-h-screen w-full max-w-[1400px] px-6 py-10 sm:px-10 lg:px-12">
@@ -1950,7 +2007,7 @@ export function V3StockPicker({ initialData, loadError }: V3StockPickerProps) {
 
         <section className="relative mx-auto w-full max-w-[1780px] border-[10px] border-[#9b8867] bg-[rgba(243,229,199,0.56)] px-6 py-6 shadow-[0_24px_80px_rgba(0,0,0,0.16)]">
           <div className="flex justify-end">
-            <ProfileMenu profile={playerProfile} />
+            <ProfileMenu profile={playerProfile} onLogout={logOutPlayer} />
           </div>
           <div className="text-center">
             <h1 className="text-5xl font-semibold tracking-tight text-black sm:text-6xl">
@@ -2167,7 +2224,7 @@ export function V3StockPicker({ initialData, loadError }: V3StockPickerProps) {
 
       <section className="relative mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-[1720px] flex-col justify-center">
         <div className="mb-4 flex justify-end">
-          <ProfileMenu profile={playerProfile} />
+          <ProfileMenu profile={playerProfile} onLogout={logOutPlayer} />
         </div>
         <div className="text-center">
           <h1 className="text-5xl font-semibold tracking-tight drop-shadow-[0_10px_30px_rgba(0,0,0,0.22)] sm:text-6xl lg:text-7xl">

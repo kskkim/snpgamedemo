@@ -49,19 +49,31 @@ function parseRunAllocations(value: Json): RunAllocation[] {
     .filter((entry): entry is RunAllocation => entry !== null);
 }
 
-function findPointAtOrBefore(
+function findNearestPoint(
   points: V3BenchmarkPoint[],
   timestamp: number,
   fallbackPrice: number
 ): V3BenchmarkPoint {
-  const point = [...points].reverse().find((entry) => entry.timestamp <= timestamp);
-
-  return (
-    point ?? {
+  if (points.length === 0) {
+    return {
       timestamp,
       price_usd: fallbackPrice,
+    };
+  }
+
+  let nearest = points[0];
+  let nearestDistance = Math.abs(points[0].timestamp - timestamp);
+
+  for (const point of points) {
+    const distance = Math.abs(point.timestamp - timestamp);
+
+    if (distance < nearestDistance) {
+      nearest = point;
+      nearestDistance = distance;
     }
-  );
+  }
+
+  return nearest;
 }
 
 export async function syncV3RunHourlyHistory(
@@ -123,7 +135,7 @@ export async function syncV3RunHourlyHistory(
     const holdingsValue = allocations.map((entry) => {
       const asset = assetsBySymbol[entry.symbol];
       const points = asset ? chartsById[asset.id] ?? [] : [];
-      const point = findPointAtOrBefore(points, capturedAtMs, entry.startingPrice);
+      const point = findNearestPoint(points, capturedAtMs, entry.startingPrice);
 
       return {
         symbol: entry.symbol,
@@ -131,7 +143,7 @@ export async function syncV3RunHourlyHistory(
       };
     });
 
-    const benchmarkPoint = findPointAtOrBefore(
+    const benchmarkPoint = findNearestPoint(
       benchmarkSeries,
       capturedAtMs,
       run.benchmark_start_price ?? benchmarkAsset.price_usd
