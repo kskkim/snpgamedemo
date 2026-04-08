@@ -1158,6 +1158,7 @@ export function V3StockPicker({ initialData, loadError }: V3StockPickerProps) {
   const [showEndChallengeConfirm, setShowEndChallengeConfirm] = useState(false);
   const [selectedPortfolioSlot, setSelectedPortfolioSlot] = useState<number | null>(null);
   const [consecutiveWins, setConsecutiveWins] = useState<number | null>(null);
+  const [dismissedResultRunId, setDismissedResultRunId] = useState<string | null>(null);
 
   const assetMap = useMemo(
     () => Object.fromEntries(currentData.assets.map((asset) => [asset.symbol, asset])),
@@ -1275,6 +1276,13 @@ export function V3StockPicker({ initialData, loadError }: V3StockPickerProps) {
         }
 
         if (
+          payload.run.status !== "active" &&
+          payload.run.id === dismissedResultRunId
+        ) {
+          return;
+        }
+
+        if (
           activeRun?.runId &&
           payload.run.id !== activeRun.runId &&
           payload.run.status !== "active"
@@ -1307,7 +1315,7 @@ export function V3StockPicker({ initialData, loadError }: V3StockPickerProps) {
     return () => {
       cancelled = true;
     };
-  }, [activeRun?.runId, assetMap, currentData.benchmark, hasRestoredState, playerProfile, step]);
+  }, [activeRun?.runId, assetMap, currentData.benchmark, dismissedResultRunId, hasRestoredState, playerProfile, step]);
 
   async function restoreActiveRunForPlayer(playerId: string): Promise<boolean> {
     try {
@@ -1909,6 +1917,7 @@ export function V3StockPicker({ initialData, loadError }: V3StockPickerProps) {
     setRemainingMs(GAME_DURATION_MS);
     setTickCount(0);
     setLastSnapshotAt(null);
+    setDismissedResultRunId(null);
     setStep("play");
   }
 
@@ -1948,6 +1957,7 @@ export function V3StockPicker({ initialData, loadError }: V3StockPickerProps) {
   }
 
   function resetGame() {
+    setDismissedResultRunId(activeRun?.runId ?? null);
     setActiveRun(null);
     setPortfolio([]);
     setSearchQuery("");
