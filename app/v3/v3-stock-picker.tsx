@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import type {
@@ -1137,6 +1138,7 @@ function PlaybackChart({
 }
 
 export function V3StockPicker({ initialData, loadError }: V3StockPickerProps) {
+  const router = useRouter();
   const [step, setStep] = useState<GameStep>("start");
   const [currentData, setCurrentData] = useState(initialData);
   const [currentLoadError, setCurrentLoadError] = useState<string | null>(loadError ?? null);
@@ -1159,6 +1161,8 @@ export function V3StockPicker({ initialData, loadError }: V3StockPickerProps) {
   const [selectedPortfolioSlot, setSelectedPortfolioSlot] = useState<number | null>(null);
   const [consecutiveWins, setConsecutiveWins] = useState<number | null>(null);
   const [dismissedResultRunId, setDismissedResultRunId] = useState<string | null>(null);
+  const [isPersistingResult, setIsPersistingResult] = useState(false);
+  const [resultPersistError, setResultPersistError] = useState<string | null>(null);
 
   const assetMap = useMemo(
     () => Object.fromEntries(currentData.assets.map((asset) => [asset.symbol, asset])),
@@ -1363,6 +1367,21 @@ export function V3StockPicker({ initialData, loadError }: V3StockPickerProps) {
     );
   }, [currentData.assets, searchQuery]);
 
+  const visibleStocks = useMemo(() => {
+    const seen = new Set<string>();
+
+    return filteredStocks.filter((asset) => {
+      const key = `${asset.id}:${asset.symbol}`;
+
+      if (seen.has(key)) {
+        return false;
+      }
+
+      seen.add(key);
+      return true;
+    });
+  }, [filteredStocks]);
+
   useEffect(() => {
     if (step !== "play" || !activeRun) {
       return;
@@ -1513,6 +1532,64 @@ export function V3StockPicker({ initialData, loadError }: V3StockPickerProps) {
 
   const isFinished = step === "play" && Boolean(activeRun) && progress >= 1;
 
+  async function persistCurrentRunResult(): Promise<boolean> {
+    if (!activeRun?.runId || !playMetrics) {
+      return false;
+    }
+
+    if (activeRun.resultSaved) {
+      return true;
+    }
+
+    setIsPersistingResult(true);
+    setResultPersistError(null);
+
+    try {
+      const response = await fetch(`/api/v3/runs/${activeRun.runId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          portfolioValue: playMetrics.portfolioValue,
+          userReturnPct: playMetrics.userReturn,
+          benchmarkReturnPct: playMetrics.benchmarkReturn,
+          alphaPct: playMetrics.alpha,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to save result.");
+      }
+
+      setActiveRun((current) => {
+        if (!current || current.runId !== activeRun.runId) {
+          return current;
+        }
+
+        return {
+          ...current,
+          resultSaved: true,
+        };
+      });
+
+      return true;
+    } catch {
+      setResultPersistError("Result save is still processing. Please try again.");
+      return false;
+    } finally {
+      setIsPersistingResult(false);
+    }
+  }
+
+  async function viewLeaderboardWithSave() {
+    const saved = await persistCurrentRunResult();
+
+    if (!saved) {
+      return;
+    }
+
+    router.push("/v3/leaderboard");
+  }
+
   useEffect(() => {
     if (!isFinished || !playerProfile?.id) {
       return;
@@ -1658,34 +1735,10 @@ export function V3StockPicker({ initialData, loadError }: V3StockPickerProps) {
     let cancelled = false;
 
     const persistRunResult = async () => {
-      try {
-        const response = await fetch(`/api/v3/runs/${activeRun.runId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            portfolioValue: playMetrics.portfolioValue,
-            userReturnPct: playMetrics.userReturn,
-            benchmarkReturnPct: playMetrics.benchmarkReturn,
-            alphaPct: playMetrics.alpha,
-          }),
-        });
+      const saved = await persistCurrentRunResult();
 
-        if (!response.ok || cancelled) {
-          return;
-        }
-
-        setActiveRun((current) => {
-          if (!current || current.runId !== activeRun.runId) {
-            return current;
-          }
-
-          return {
-            ...current,
-            resultSaved: true,
-          };
-        });
-      } catch {
-        // Keep the result visible even if leaderboard persistence fails temporarily.
+      if (!saved || cancelled) {
+        return;
       }
     };
 
@@ -1967,6 +2020,7 @@ export function V3StockPicker({ initialData, loadError }: V3StockPickerProps) {
     setRemainingMs(GAME_DURATION_MS);
     setLastSnapshotAt(null);
     setConsecutiveWins(null);
+    setResultPersistError(null);
     setStep("start");
   }
 
@@ -1983,6 +2037,7 @@ export function V3StockPicker({ initialData, loadError }: V3StockPickerProps) {
     setRemainingMs(GAME_DURATION_MS);
     setLastSnapshotAt(null);
     setConsecutiveWins(null);
+    setResultPersistError(null);
     setStep("start");
   }
 
@@ -2000,6 +2055,7 @@ export function V3StockPicker({ initialData, loadError }: V3StockPickerProps) {
     setRemainingMs(GAME_DURATION_MS);
     setLastSnapshotAt(null);
     setConsecutiveWins(null);
+    setResultPersistError(null);
     setStep("start");
   }
 
@@ -2233,13 +2289,18 @@ export function V3StockPicker({ initialData, loadError }: V3StockPickerProps) {
                 >
                   Play Again
                 </button>
-                <Link
-                  href="/v3/leaderboard"
-                  className="rounded-full border border-panel-border bg-white px-8 py-3 text-base font-semibold text-foreground"
+                <button
+                  type="button"
+                  onClick={() => void viewLeaderboardWithSave()}
+                  disabled={isPersistingResult}
+                  className="rounded-full border border-panel-border bg-white px-8 py-3 text-base font-semibold text-foreground disabled:cursor-not-allowed disabled:opacity-70"
                 >
-                  View leaderboard
-                </Link>
+                  {isPersistingResult ? "Saving..." : "View leaderboard"}
+                </button>
               </div>
+              {resultPersistError ? (
+                <p className="mt-3 text-sm text-red-600">{resultPersistError}</p>
+              ) : null}
             </div>
           </div>
         ) : null}
@@ -2370,7 +2431,7 @@ export function V3StockPicker({ initialData, loadError }: V3StockPickerProps) {
                     <span className="justify-self-center opacity-0">Add</span>
                   </div>
                   <div className="h-[536px] overflow-y-auto p-2">
-                    {filteredStocks.map((asset, index) => {
+                    {visibleStocks.map((asset, index) => {
                       const isAdded = Boolean(portfolioMap[asset.symbol]);
                       const rowBg =
                         index % 2 === 0 ? "bg-[rgba(255,255,255,0.9)]" : "bg-[rgba(245,248,251,0.92)]";
@@ -2403,7 +2464,7 @@ export function V3StockPicker({ initialData, loadError }: V3StockPickerProps) {
                         </div>
                       );
                     })}
-                    {filteredStocks.length === 0 ? (
+                    {visibleStocks.length === 0 ? (
                       <div className="rounded-[1rem] bg-[rgba(255,255,255,0.82)] px-4 py-10 text-center text-sm text-[#31424b]">
                         No matching assets found in the shared V3 dataset.
                       </div>
@@ -2490,7 +2551,7 @@ export function V3StockPicker({ initialData, loadError }: V3StockPickerProps) {
 
                   {selectedPortfolioSlot !== null ? (
                     <PortfolioSlotPicker
-                      assets={filteredStocks}
+                      assets={visibleStocks}
                       addedSymbols={addedSymbols}
                       onSelect={(symbol) => setPortfolioSlot(symbol, selectedPortfolioSlot)}
                       onClose={() => setSelectedPortfolioSlot(null)}
