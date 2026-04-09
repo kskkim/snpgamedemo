@@ -27,48 +27,39 @@ function getCurrentWinStreak(
   return streak;
 }
 
+function getDisplayUsername(playerUsername: string, playerEmail: string): string {
+  const fromEmail = playerEmail.split("@")[0]?.trim();
+  return fromEmail || playerUsername || "Unknown";
+}
+
 function buildRows(
   runs: Awaited<ReturnType<typeof listV3Leaderboard>>,
   sortMode: SortMode
 ): LeaderboardRow[] {
-  const runsByPlayer = new Map<
-    string,
-    Array<{
-      id: string;
-      player_username: string;
-      player_email: string;
-      alpha_pct: number | null;
-      completed_at: string | null;
-    }>
-  >();
-
+  const runsByPlayer = new Map<string, typeof runs>();
   for (const run of runs) {
-    const playerRuns = runsByPlayer.get(run.player_id) ?? [];
-    playerRuns.push({
-      id: run.id,
-      player_username: run.player_username,
-      player_email: run.player_email,
-      alpha_pct: run.alpha_pct,
-      completed_at: run.completed_at,
-    });
-    runsByPlayer.set(run.player_id, playerRuns);
+    const existing = runsByPlayer.get(run.player_id) ?? [];
+    existing.push(run);
+    runsByPlayer.set(run.player_id, existing);
   }
 
-  const rows = Array.from(runsByPlayer.entries()).map(([playerId, playerRuns]) => {
-    const sortedRuns = [...playerRuns].sort((left, right) => {
-      return new Date(right.completed_at ?? 0).getTime() - new Date(left.completed_at ?? 0).getTime();
-    });
-    const latestRun = sortedRuns[0];
-    const bestAlpha = Math.max(...sortedRuns.map((run) => run.alpha_pct ?? 0));
-    const currentStreak = getCurrentWinStreak(sortedRuns);
+  const streakByPlayer = new Map<string, number>();
+  for (const [playerId, playerRuns] of runsByPlayer.entries()) {
+    const sortedRuns = [...playerRuns].sort(
+      (left, right) =>
+        new Date(right.completed_at ?? 0).getTime() - new Date(left.completed_at ?? 0).getTime()
+    );
+    streakByPlayer.set(playerId, getCurrentWinStreak(sortedRuns));
+  }
 
+  const rows = runs.map((run) => {
     return {
-      id: playerId,
-      username: latestRun?.player_username ?? "Unknown",
-      email: latestRun?.player_email ?? "",
-      alpha: sortMode === "streak" ? latestRun?.alpha_pct ?? 0 : bestAlpha,
-      streak: currentStreak,
-      completedAt: latestRun?.completed_at ?? null,
+      id: run.id,
+      username: getDisplayUsername(run.player_username, run.player_email),
+      email: run.player_email,
+      alpha: run.alpha_pct ?? 0,
+      streak: streakByPlayer.get(run.player_id) ?? 0,
+      completedAt: run.completed_at,
     } satisfies LeaderboardRow;
   });
 
@@ -76,6 +67,9 @@ function buildRows(
     if (sortMode === "streak") {
       if (right.streak !== left.streak) {
         return right.streak - left.streak;
+      }
+      if (right.alpha !== left.alpha) {
+        return right.alpha - left.alpha;
       }
     } else if (right.alpha !== left.alpha) {
       return right.alpha - left.alpha;
